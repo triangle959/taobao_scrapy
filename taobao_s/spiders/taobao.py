@@ -2,31 +2,30 @@
 import json
 import scrapy
 from pathlib import Path
+import random
+from time import sleep
 from urllib import parse
 
 from selenium import webdriver
+from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 from taobao_s.items import TaobaoSItem
+from taobao_s.search_text import KEY_WORDS, PAGE_NUM
 
 class TaobaoSpider(scrapy.Spider):
     name = 'taobao'
     allowed_domains = ['s.taobao.com', 'rate.tmall.com']
-    start_urls = ['http://s.taobao.com/search?q=']
+    #start_urls = ['http://s.taobao.com/search?q=']
     base_url = 'https://s.taobao.com/search?q=%s&sort=sale-desc&s=%s'
-    detail_urls = []
-    data = []
-    headers ={
-        "User-Agent": "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/536.11 (KHTML, like Gecko) Chrome/20.0.1132.11 TaoBrowser/2.0 Safari/536.11"
-    }
+
     # scrapy请求的开始时start_request
     def start_requests(self):
         # taobao_findUrl = 'https://s.taobao.com/search?q=%E5%B8%BD%E5%AD%90&imgfile=&commend=all&ssid=s5-e&search_type=item&sourceId=tb.index&spm=a21bo.50862.201856-taobao-item.1&ie=utf8&initiative_id=tbindexz_20170817&s=300'
         if not Path('taobaoCookies.json').exists():
             __class__.loginTaobao()  # 先执行login，保存cookies之后便可以免登录操作
-        # 毕竟每次执行都要登录还是挺麻烦的，我们要充分利用cookies的作用
         # 从文件中获取保存的cookies
         with open('taobaoCookies.json', 'r', encoding='utf-8') as f:
             listcookies = json.loads(f.read())  # 获取cookies
@@ -35,16 +34,17 @@ class TaobaoSpider(scrapy.Spider):
         for cookie in listcookies:
             # 在保存成dict时，我们其实只要cookies中的name和value，而domain等其他都可以不要
             cookies_dict[cookie['name']] = cookie['value']
-        key_words = self.settings['KEY_WORDS']
+        key_words = KEY_WORDS
         key_words = parse.quote(key_words).replace(' ', '+')
         print(key_words)
-        page_num = self.settings['PAGE_NUM']
+        page_num = PAGE_NUM
         one_page_num = self.settings['ONE_PAGE_COUNT']
         for i in range(page_num):
             url = self.base_url % (key_words, i*one_page_num)
-            yield scrapy.Request(url, cookies=cookies_dict, callback=self.parse, headers=__class__.headers)
+            sleep(random.randint(1,3))
+            yield scrapy.Request(url, cookies=cookies_dict, callback=self.parse)
 
-    # 使用selenium登录知乎并获取登录后的cookies，后续需要登录的操作都可以利用cookies
+    # 使用selenium登录并获取登录后的cookies，后续需要登录的操作都可以利用cookies
     @staticmethod
     def loginTaobao():
         url = 'https://login.taobao.com/member/login.jhtml'
@@ -62,8 +62,8 @@ class TaobaoSpider(scrapy.Spider):
         browser.implicitly_wait(30)  # 智能等待，直到网页加载完毕，最长等待时间为30s
         browser.find_element_by_xpath('//*[@class="forget-pwd J_Quick2Static"]').click()
         browser.find_element_by_xpath('//*[@class="weibo-login"]').click()
-        browser.find_element_by_name('username').send_keys('微博账号')
-        browser.find_element_by_name('password').send_keys('微博密码')
+        browser.find_element_by_name('username').send_keys('zhan_jinzhou@sina.com')
+        browser.find_element_by_name('password').send_keys('qwer@123')
         browser.find_element_by_xpath('//*[@class="btn_tip"]/a/span').click()
         # try:
         #     WebDriverWait(self.browser, 5, 0.5).until(
@@ -93,19 +93,29 @@ class TaobaoSpider(scrapy.Spider):
             f.write(jsonCookies)
         print(cookies)
 
-    def url_decode(self, temp):
-        while '\\' in temp:
-            index = temp.find('\\')
-            st = temp[index:index + 7]
-            temp = temp.replace(st, '')
+    def open_url(self, url):
+        options = webdriver.ChromeOptions()
+        # 不加载图片,加快访问速度
+        # options.add_experimental_option("prefs", {"profile.managed_default_content_settings.images": 2})
+        # 此步骤很重要，设置为开发者模式，防止被各大网站识别出来使用了Selenium
+        options.add_experimental_option('excludeSwitches', ['enable-automation'])
+        options.add_argument('--headless')
+        browser = webdriver.Chrome(executable_path="G:\chromedriver_win32\chromedriver.exe", options=options)
+        wait = WebDriverWait(browser, 10)  # 超时时长为10s
+        # 打开网页
+        browser.get(url)
+        try:
+            WebDriverWait(browser, 5, 0.5).until(
+                EC.presence_of_element_located((By.ID, "nc_1__scale_text")))  # 等待滑动拖动控件出现
+            swipe_button = browser.find_element_by_xpath('//*[@id="nc_1__scale_text"]/span')  # 获取滑动拖动控件
+            # 模拟拽托
+            action = ActionChains(browser)  # 实例化一个action对象
+            action.click_and_hold(swipe_button).perform()  # perform()用来执行ActionChains中存储的行为
+            action.reset_actions()
+            action.move_by_offset(580, 0).perform()  # 移动滑块
+        except Exception as e:
+            print('get button failed: ', e)
 
-        index = temp.find('id')
-        temp = temp[:index + 2] + '=' + temp[index + 2:]
-        index = temp.find('ns')
-        temp = temp[:index] + '&' + 'ns=' + temp[index + 2:]
-        index = temp.find('abbucket')
-        temp = 'https:' + temp[:index] + '&' + 'abbucket=' + temp[index + 8:]
-        return temp
 
     def parse(self, response):
         p = 'g_page_config = ({.*?});'
@@ -132,23 +142,19 @@ class TaobaoSpider(scrapy.Spider):
             item['nid'] = auction['nid']
             item['sellerid'] = auction['user_id']
             yield item
-
             # #天猫爬取商品详情页
             # if 'tmall' in item['detail_url']:
             #     for i in range(2):
             #         print(item['sellerid'])
             #         url = url1 % (item['nid'], item['sellerid'], str(i+1))
             #         print(url)
-            #         request = scrapy.Request(url, cookies=cookies_dict, callback=self.parseNext, headers=__class__.headers)
+            #         request = scrapy.Request(url, cookies=cookies_dict, callback=self.parseNext, meta={'item':item})
             #         yield request
 
     def parseNext(self, response):
+        print(response.meta['item']['detail_url'])
         print(response.text)
         # p = 'jsonp128({.*?})'
         # page_info = response.selector.re(p)[0]
         # page_info = json.loads(page_info)
         # print(page_info)
-
-
-
-

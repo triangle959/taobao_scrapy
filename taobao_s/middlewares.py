@@ -5,6 +5,7 @@
 # See documentation in:
 # https://doc.scrapy.org/en/latest/topics/spider-middleware.html
 import json
+import random
 from scrapy import signals
 from scrapy.http import HtmlResponse
 
@@ -14,6 +15,20 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver import ActionChains
 
+from taobao_s.settings import USER_AGENT_LIST, PROXIES
+
+
+class RandomUserAgentMiddleware(object):
+    def process_request(self, request, spider):
+        ua  = random.choice(USER_AGENT_LIST)
+        if ua:
+            request.headers.setdefault('User-Agent', ua)
+
+class ProxyMiddleware(object):
+
+    def process_request(self, request, spider):
+        proxy = random.choice(PROXIES)
+        request.meta['proxy'] = proxy
 
 class TaobaoSSpiderMiddleware(object):
     # Not all methods need to be defined. If a method is not defined,
