@@ -1,0 +1,2 @@
+KEY_WORDS = "Nike男鞋"
+PAGE_NUM = 10
