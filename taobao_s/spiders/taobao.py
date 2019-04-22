@@ -62,8 +62,8 @@ class TaobaoSpider(scrapy.Spider):
         browser.implicitly_wait(30)  # 智能等待，直到网页加载完毕，最长等待时间为30s
         browser.find_element_by_xpath('//*[@class="forget-pwd J_Quick2Static"]').click()
         browser.find_element_by_xpath('//*[@class="weibo-login"]').click()
-        browser.find_element_by_name('username').send_keys('zhan_jinzhou@sina.com')
-        browser.find_element_by_name('password').send_keys('qwer@123')
+        browser.find_element_by_name('username').send_keys('微博账号')
+        browser.find_element_by_name('password').send_keys('微博密码')
         browser.find_element_by_xpath('//*[@class="btn_tip"]/a/span').click()
         # try:
         #     WebDriverWait(self.browser, 5, 0.5).until(
